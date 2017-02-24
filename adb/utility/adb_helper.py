@@ -11,6 +11,7 @@ start app
 import os
 import logging
 import subprocess
+import re
 
 def is_windows():
     if os.name in ('nt','ce'):
@@ -95,7 +96,7 @@ class AdbHelper (object):
             raise Exception("command can't be empty")
         fullCmd = self.adb + " " +  " ".join(self.adb_defaultArgs) + " " + cmd
         #return os.popen(fullCmd).readline()
-        process = subprocess.Popen(fullCmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(fullCmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         stdoutdata, stderrdata = process.communicate()
         self.logger.debug(fullCmd + " status " + str(process.returncode))
         if process.returncode:
@@ -161,8 +162,44 @@ class AdbHelper (object):
         return False
 
     def push(self, localPath, remotePah):
-        self.execshell("push %s %s  " % (localPath,remotePah) )
+        return self.execshell("push %s %s  " % (localPath,remotePah) )
 
     def pull(self, remotePath, localPath):
-        self.execshell("pull %s %s" % (remotePath, localPath) )
+        return self.execshell("pull %s %s" % (remotePath, localPath) )
+
+    def forwardPort(self, systemPort, devicePort):
+        '''
+        adb forward <local> <remote> - forward socket connections
+                                 forward specs are one of:
+                                   tcp:<port>
+                                   localabstract:<unix domain socket name>
+                                   localreserved:<unix domain socket name>
+                                   localfilesystem:<unix domain socket name>
+                                   dev:<character device name>
+                                   jdwp:<process pid> (remote only)
+        :param systemPort:  PC机的端口号
+        :param devicePort:  设备(手机、模拟器)端口号
+        :return:
+        '''
+        return self.execshell("forward tcp: %s tcp: %s" % (systemPort, devicePort))
+
+    def isDeviceConnected(self):
+        devices = self.getConnectDevices()
+        if len(devices) > 0:
+            return True
+        else:
+            return False
+
+    def getPIDByName(self, name):
+        command = " shell ps '%s'" % name
+        result = self.execshell(command)
+        pids = []
+        for line in result.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            m = re.match("[^\t ]+[\t ]+([0-9]+)", line)
+            if m is not None:
+                pids.append(m.group(1))
+        return pids
 
