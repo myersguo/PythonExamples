@@ -12,6 +12,7 @@ import os
 import logging
 import subprocess
 import re
+import time
 
 def is_windows():
     if os.name in ('nt','ce'):
@@ -90,13 +91,19 @@ class AdbHelper (object):
                 return True,bi
 
         raise   Exception("%s not found", binaryName)
+    def shell(self, cmd):
+        return self.execshell("shell %s" % cmd)
 
     def execshell(self,cmd):
         if not cmd:
             raise Exception("command can't be empty")
         fullCmd = self.adb + " " +  " ".join(self.adb_defaultArgs) + " " + cmd
         #return os.popen(fullCmd).readline()
-        process = subprocess.Popen(fullCmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        try:
+            process = subprocess.Popen(fullCmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except (OSError, ValueError) as err:
+            self.logger.error("Run %s command Exception", fullCmd)
+            raise Exception("subprocesserror")
         stdoutdata, stderrdata = process.communicate()
         self.logger.debug(fullCmd + " status " + str(process.returncode))
         if process.returncode:
@@ -165,7 +172,7 @@ class AdbHelper (object):
         return self.execshell("push %s %s  " % (localPath,remotePah) )
 
     def pull(self, remotePath, localPath):
-        return self.execshell("pull %s %s" % (remotePath, localPath) )
+        return self.execshell("pull %s %s\r\n" % (remotePath, localPath) )
 
     def forwardPort(self, systemPort, devicePort):
         '''
@@ -203,3 +210,57 @@ class AdbHelper (object):
                 pids.append(m.group(1))
         return pids
 
+    def killProcessByPID(self, pid):
+        '''
+        需要root权限
+        :param pid:
+        :return:
+        '''
+        self.shell("kill  %s" % pid)
+
+    def killProcessByName(self, name):
+        pids = self.getPIDByName(name)
+        for pid in pids:
+            self.logger.debug('kill process %s' % pid)
+            self.killProcessByPID(pid)
+
+    def uiautomator_dump(self, path):
+        self.shell("uiautomator dump /sdcard/window_dump.xml")
+        return self.pull("/sdcard/window_dump.xml", path)
+
+    def clear(self, pkg):
+        return self.shell("pm clear %s " % pkg)
+
+    def forceStop(self, pkg):
+        return self.shell("am force-stop %s " % (pkg,))
+
+    def install(self, apk, replace=True):
+        cmd = 'install'
+        if replace:
+            cmd +=  ' -r '
+        cmd += '"%s"' % apk
+        return self.execshell(cmd)
+
+    def uninstall(self, pkg):
+        self.forceStop(pkg)
+        result = self.execshell("uninstall %s " % (pkg,))
+        if result.find("Success") == -1:
+            self.logger.debug("App was not uninstalled")
+        else:
+            self.logger.debug("App was uninstalled")
+
+    def mkdir(self, path):
+        return self.shell('mkdir -p %s' % (path))
+    def remove(self, path):
+        return self.shell("rm -rf %s" % (path))
+
+    def screenshot(self, despath):
+        '''
+        截屏
+        :param despath:
+        :return:
+        '''
+        path = '/sdcard/%s.png' % (time.time(),)
+        self.shell("screencap -p %s" % (path,))
+        self.pull(path, despath)
+        self.remove(path)
