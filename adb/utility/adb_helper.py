@@ -91,10 +91,10 @@ class AdbHelper (object):
                 return True,bi
 
         raise   Exception("%s not found", binaryName)
-    def shell(self, cmd):
-        return self.execshell("shell %s" % cmd)
+    def shell(self, cmd, wait=True):
+        return self.execshell("shell %s" % cmd, wait)
 
-    def execshell(self,cmd):
+    def execshell(self,cmd, wait=True):
         if not cmd:
             raise Exception("command can't be empty")
         fullCmd = self.adb + " " +  " ".join(self.adb_defaultArgs) + " " + cmd
@@ -104,13 +104,14 @@ class AdbHelper (object):
         except (OSError, ValueError) as err:
             self.logger.error("Run %s command Exception", fullCmd)
             raise Exception("subprocesserror")
+        if wait == False:
+            return True,''
         stdoutdata, stderrdata = process.communicate()
         self.logger.debug(fullCmd + " status " + str(process.returncode))
         if process.returncode:
-            return stderrdata
+            return False, stderrdata
         else:
-            return stdoutdata
-        return
+            return True,stdoutdata
         # result = []
         # while True:
         #     output = process.stdout.readline()
@@ -122,11 +123,12 @@ class AdbHelper (object):
 
     def setDeviceId(self, deviceId):
         self.currentDeviceId = deviceId
-        self.adb_defaultArgs.extend(("-s",deviceId))
+        if not "-s " + deviceId in self.adb_defaultArgs:
+            self.adb_defaultArgs.append("-s " + deviceId)
 
     def getConnectDevices(self):
         self.logger.debug("Get connected devices")
-        output_lines = self.execshell("devices")
+        result,output_lines = self.execshell("devices")
         _devices = []
         for line in output_lines.split('\r\n'):
             if line.strip() and line.find("List of devices") == -1 and line.find("* daemon") == -1 and line.find("offline")==-1:
@@ -143,8 +145,7 @@ class AdbHelper (object):
         """
         kill adb server by shell
         """
-        self.execshell("kill-server")
-        return
+        return self.execshell("kill-server")
 
     def checkProcess(self, processName):
         '''
@@ -155,7 +156,7 @@ class AdbHelper (object):
         :return:
         '''
         self.logger.debug("Check process %s" % processName)
-        output = self.execshell("shell ps")
+        result,output = self.execshell("shell ps")
         for line in output.split("\r\n"):
             line = line.strip().split()
             if not line:
@@ -199,9 +200,9 @@ class AdbHelper (object):
 
     def getPIDByName(self, name):
         command = " shell ps '%s'" % name
-        result = self.execshell(command)
+        result, output = self.execshell(command)
         pids = []
-        for line in result.split("\n"):
+        for line in output.split("\n"):
             line = line.strip()
             if not line:
                 continue
@@ -216,7 +217,7 @@ class AdbHelper (object):
         :param pid:
         :return:
         '''
-        self.shell("kill  %s" % pid)
+        return self.shell("kill  %s" % pid)
 
     def killProcessByName(self, name):
         pids = self.getPIDByName(name)
@@ -264,3 +265,27 @@ class AdbHelper (object):
         self.shell("screencap -p %s" % (path,))
         self.pull(path, despath)
         self.remove(path)
+
+    def exescript(self, path):
+        '''
+        执行本地脚本
+        push script file to /data/local/tmp/
+        增加执行权限
+        chmod 0777 /data/local/tmp/file
+        执行脚本
+        /data/local/tmp/file
+        :param path:
+        :return:
+        '''
+        destFile = "/data/local/tmp/" + str(time.time()) + ".sh"
+        result,_ = self.push(path,destFile)
+        if not result:
+            return False,'push file (%s) to device failed' % path
+        cmd = "chmod 0777 %s" % destFile
+        result,_ = self.shell(cmd)
+        if not result:
+            return False, 'change file (%s) mod failed' % destFile
+        self.logger.debug("exec script: %s" % destFile)
+        return self.shell(destFile, False)
+
+
