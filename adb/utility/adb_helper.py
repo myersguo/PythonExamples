@@ -199,7 +199,8 @@ class AdbHelper (object):
             return False
 
     def getPIDByName(self, name):
-        command = " shell ps '%s'" % name
+        #command = " shell ps '%s'" % name
+        command = " shell ps | grep %s " % name
         result, output = self.execshell(command)
         pids = []
         for line in output.split("\n"):
@@ -236,6 +237,12 @@ class AdbHelper (object):
         return self.shell("am force-stop %s " % (pkg,))
 
     def install(self, apk, replace=True):
+        '''
+        用adb install安装应用包
+        :param apk:
+        :param replace:
+        :return:
+        '''
         cmd = 'install'
         if replace:
             cmd +=  ' -r '
@@ -287,5 +294,185 @@ class AdbHelper (object):
             return False, 'change file (%s) mod failed' % destFile
         self.logger.debug("exec script: %s" % destFile)
         return self.shell(destFile, False)
+
+    def getstarttime(self, pkg):
+        _,result = self.shell("am start -S -W %s | grep TotalTime" % pkg)
+        if result:
+            return result.split(":")[-1].strip()
+        return  ''
+
+    def getmeminfo(self, type=None):
+        '''
+        获取内存信息,android.os.Process readProcLines
+        /proc/meminfo 文件包含内存所有信息
+        MemTotal:        2015044 kB
+        MemFree:           92984 kB
+        Buffers:           47724 kB
+        Cached:           239408 kB
+        ...
+        :return:
+        '''
+        result,meminfo = self.shell("cat /proc/meminfo")
+        if not result:
+            return False,'get meminfo failed'
+
+        if not type:
+            return True, meminfo.split('\r\n')
+
+        meminfos = meminfo.split('\r\n')
+        if type == 'total':
+            return True, meminfos[0].split(":")[-1].strip()
+        elif type == 'free':
+            return True, meminfos[1].split(":")[-1].strip()
+        elif type == 'buffer':
+            return True, meminfos[2].split(":")[-1].strip()
+
+    def getMemTotal(self):
+        return self.getmeminfo('total')
+
+    def getMemFree(self):
+        return self.getmeminfo('free')
+
+    def getMemFuffers(self):
+        return self.getmeminfo('buffer')
+
+    def getDumpmeminfo(self, package='', find='TOTAL'):
+        '''
+        根据应用包名查看内存信息,默认返回TOTAL信息
+        使用dumpsys meminfo
+        例如：
+        Applications Memory Usage (kB):
+        Uptime: 1257823060 Realtime: 1500084325
+
+        ** MEMINFO in pid 14891 [com.mi.global.shop] **
+                        Pss      Private  Private  Swapped     Heap     Heap     Heap
+                        Total    Dirty    Clean    Dirty     Size    Alloc     Free
+                        ------   ------   ------   ------   ------   ------   ------
+          Native Heap        0        0        0        0    19884    15058     4157
+          Dalvik Heap    46824    46684        0    18824    81336    68169    13167
+         Dalvik Other     5087     4932       28      572
+                Stack      768      768        0        8
+               Ashmem      134       76        0        0
+            Other dev      196      188        8        0
+             .so mmap    11548     2680     3580     1312
+            .apk mmap      488        0      156        0
+            .ttf mmap      151        0      104        0
+            .dex mmap     5646      112     4424       52
+           Other mmap     1062        4      932        0
+              Unknown    14625    14604        0      116
+                TOTAL    86529    70048     9232    20884   101220    83227    17324
+
+         Objects
+                       Views:      855         ViewRootImpl:        2
+                 AppContexts:        5           Activities:        2
+                      Assets:        5        AssetManagers:        5
+               Local Binders:       22        Proxy Binders:       29
+            Death Recipients:        1
+             OpenSSL Sockets:       15
+
+         SQL
+                 MEMORY_USED:      727
+          PAGECACHE_OVERFLOW:      635          MALLOC_SIZE:       85
+
+         DATABASES
+              pgsz     dbsz   Lookaside(b)          cache  Dbname
+                 4      604            103       66/50/15  /data/data/com.mi.global.shop/databases/google_analytics_v4.db
+        :param package:
+        :return:
+        '''
+        result, meminfo = self.shell("dumpsys meminfo %s" % package)
+        if not result:
+            return False, 'dumpsys meminfo failed'
+
+        if "No process found for:" in meminfo:
+            return False, "Not process found for %s" % package
+
+        for line in meminfo.split("\r\n"):
+            if find in line:
+                return line
+
+    def getProcessCpuInfo(self, pid):
+        result,cpuinfo = self.shell("cat /proc/%s/stat" % pid)
+        if not result:
+            return False,cpuinfo
+        return True, cpuinfo.split()
+
+    def getProcessCpuUsage(self, pkg):
+        '''
+        获取某个PID的CPU信息: /proc/pid/stat
+        pid   command  state parentid groupid  sessionid tty_nr tpgidb flags minflt cminflt majflt cmajflt utime stime...
+        计算公式(http://stackoverflow.com/questions/1420426/how-to-calculate-the-cpu-usage-of-a-process-by-pid-in-linux-from-c#answer-1424556)：
+        1. pidtotal = utime + cutime
+        2. total = /proc/stat total
+        usage = pidtotal_diff/total_diff
+        :return:
+        '''
+        pids = self.getPIDByName(pkg)
+        if len(pids)<=0:
+            return False, "No process found for %s " % pkg
+        pid = pids[0]
+        result,cpuinfo_pid = self.getProcessCpuInfo(pid)
+        if not result:
+            return False, "Get process %s cpu info failed " % pid
+        utime1 = int(cpuinfo_pid[13])
+        stime1 = int(cpuinfo_pid[14])
+        pid_cpu_total1 = utime1 + stime1
+        result, cpuinfo_total = self.getCpuInfo()
+        if not result:
+            return False, "Get Cpu info  %s  failed "
+        total1 = sum(int(i) for i in cpuinfo_total[1:])
+        #时间片
+        time.sleep(1)#sleep for 0.5 second
+
+        result, cpuinfo_pid = self.getProcessCpuInfo(pid)
+        utime2 = int(cpuinfo_pid[13])
+        stime2 = int(cpuinfo_pid[14])
+        pid_cpu_total2 = utime2 + stime2
+        result, cpuinfo_total2 = self.getCpuInfo()
+        total2 = sum(int(i) for i in cpuinfo_total2[1:])
+        cpu_usage = 0.0
+        if total2-total1 >0:
+            cpu_usage = 100 * (pid_cpu_total2-pid_cpu_total1) / ((total2-total1) * 1.0)
+        return True, cpu_usage
+
+    def getCpuInfo(self):
+        '''
+         获取CPU的信息: cat /proc/stat
+             user nice system idle iowait  irq  softirq steal guest guest_nice
+        cpu  4705 356  584    3699   23    23     0       0     0          0
+              用户态运行时间 nice值为负（高优先级）进程占用CPU时间，核心态时间，除iowait外的等待时间，iowait时间，硬中断时间,软中断时间,丢失时间(被其他虚拟CPU抢占)
+        :return:
+        '''
+        result, statinfo = self.shell("cat /proc/stat")
+        if not result:
+            return False, statinfo
+        cpu_line = statinfo.split("\r\n")[0]
+        cpu_info = cpu_line.split()
+        return True, cpu_info
+
+    def getCpuUsage(self):
+        '''
+        CPU时间占用率计算公式：(一段时间内的cpu占用率 (1-idle)/total)
+            total = total2 - total1
+            idle = idle2 - idle1
+            cpu_usage = (total - idle)/total * 100
+        :return:
+        '''
+        result, cpu_info = self.getCpuInfo()
+        if not result:
+            return False, cpu_info
+        idle1 = int(cpu_info[4]) + int(cpu_info[5])
+        total1 = sum(int(i) for i in cpu_info[1:])
+        #diff时间为0.5s
+        time.sleep(0.5)
+        result, cpu_info2 = self.getCpuInfo()
+        idle2 = int(cpu_info2[4]) + int(cpu_info2[5])
+        total2 = sum(int(j) for j in cpu_info2[1:])
+        cpu_usage = 100- 100*(idle2 - idle1)/((total2-total1)*1.0)
+        return True, cpu_usage
+
+
+
+
 
 
