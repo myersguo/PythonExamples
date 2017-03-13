@@ -1,0 +1,44 @@
+<!--
+性能统计趋势图
+cpu 趋势
+mem 趋势
+-->
+<html>
+<head>
+</head>
+<body>
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/exporting.js"></script>
+<div style="padding:20px">
+    <h3>性能统计:</h3>
+    <hr>
+    <div id="cpu"></div>
+    <div id="meminfo"></div>
+</div>
+
+<script>
+Highcharts.chart('cpu', {
+    title: {
+        text: 'CPU使用率'
+    },
+    series: [{
+        name: 'CPU使用率',
+        data: {{ cpuinfo }}
+    }]
+});
+
+Highcharts.chart('meminfo', {
+    title: {
+        text: '内存占用'
+    },
+    series: [{
+        name: '内存占用',
+        data: {{ meminfo }}
+    }]
+});
+</script>
+
+</body>
+</html>
+
+

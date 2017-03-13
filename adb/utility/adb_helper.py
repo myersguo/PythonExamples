@@ -471,8 +471,77 @@ class AdbHelper (object):
         cpu_usage = 100- 100*(idle2 - idle1)/((total2-total1)*1.0)
         return True, cpu_usage
 
+    def getBatteryInfo(self, search=None):
+        '''
+        获取电量值: dumpsys battery
+        :return:
+        '''
+        result,battery_info = self.shell("dumpsys battery")
+        if not result:
+            return False, "dumpsys battery failed"
+        if search is None:
+            return True, battery_info.split("\r\r\n")
+        info = battery_info.split("\r\r\n")
+        for list in info:
+            pos = list.find(search)
+            if pos>=0:
+                return list[pos+len(search):]
 
+    def getBatteryLevel(self):
+        return self.getBatteryInfo('level:')
 
+    def getBatteryHealthStatus(self):
+        '''
+        获取电池健康状态
+        1: BATTERY_HEALTH_UNKNOWN 未知
+        2: BATTERY_HEALTH_GOOD 状态良好
+        3：BATTERY_HEALTH_OVERHEAT 电池过热
+        4: BATTERY_HEALTH_DEAD 没有电了
+        5： BATTERY_HEALTH_OVER_VOLTAGE 电池电压过高
+        6：BATTERY_HEALTH_UNSPECIFIED_FAILURE
+        :return:
+        '''
+        return self.getBatteryInfo('health:')
 
+    def getBatteryStatus(self):
+        '''
+        获取电池健康状态
+        1: BATTERY_STATUS_UNKNOWN 未知
+        2: BATTERY_STATUS_CHARGING 充电中
+        3：BATTERY_STATUS_DISCHARGING 放电中
+        4: BATTERY_STATUS_NOT_CHARGING 未充电
+        5： BATTERY_STATUS_FULL 已充满
+        :return:
+        '''
+        return self.getBatteryInfo('status:')
 
+    def getFPSInfo(self):
+        '''
+        !!!需要root权限
+        https://android.googlesource.com/platform/frameworks/native/+/f67623632a545bd9ca1d8afefc3dd0789eaba6b3/services/surfaceflinger/SurfaceFlinger.cpp#2508
+        service call SurfaceFlinger 1013
+        计算公式
+        surface_after-surface_before/time_diff
+        :return:
+        '''
+        result, fps_info = self.shell("service call SurfaceFlinger 1013")
+        assert result==True
+        match = re.search('^Result: Parcel\((\w+)', fps_info[0])
+        cur_surface = 0
+        if not match:
+            raise Exception(fps_info)
+        cur_surface = int(match.group(1), 16)
+        return {
+            'page_flip_count': cur_surface,
+            'timestamp': time.time()
+        }
 
+    def getFPS(self):
+        '''
+        计算FPS
+        :return:
+        '''
+        surface_before = self.getFPSInfo()
+        time.sleep(1)
+        surface_after = self.getFPSInfo()
+        return (surface_after['page_flip_count'] - surface_before['page_flip_count'])/1.0

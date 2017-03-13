@@ -3,7 +3,12 @@
 
 import os, sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/../../")
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 from adb.utility import adb_helper
+from jinja2 import Template
+import time
 
 class Monkey(object):
     def __init__(self):
@@ -20,6 +25,30 @@ class Monkey(object):
            self.adb.logger.debug("Device Id: %s Run monkey script:")
            self.adb.setDeviceId(device['uuid'])
            self.adb.shell("monkey " + args, wait=False)
+        #获取统计数据
+        cpu_data = []
+        mem_data = []
+        while(True):
+            #检查monkey是否结束
+            pid = self.adb.getPIDByName("com.android.commands.monke")
+            if len(pid)<=0:
+                break
+            result1, cpu = self.adb.getCpuUsage()
+            result2, mem = self.adb.getMemTotal()
+            if not result1 or not result2:
+                continue
+            mem = float(mem.split()[0])
+            cpu_data.append(cpu)
+            mem_data.append(mem)
+        #输出为html report
+        f = open('./template/performance.html')
+        template_str = f.read()
+        template = Template(template_str)
+        out = template.render({"cpuinfo": cpu_data, "meminfo": mem_data})
+        dest_file = "./output/" + str(time.time()) + "_monkey_performance.html"
+        f = open(dest_file, 'w')
+        f.write(out)
+
 
 if __name__ == "__main__":
     monkeytool = Monkey()
@@ -27,5 +56,5 @@ if __name__ == "__main__":
     if len(monkey_argv)>1:
         arg = monkey_argv[1]
     else:
-        arg = '-v -v -v --pct-syskeys 0 --pct-motion 0 --throttle 300 --bugreport 100000'
+        arg = '-v -v -v -p com.example.android.testing.uiautomator.BasicSample --pct-syskeys 0 --pct-motion 0 --throttle 300 --bugreport 1000'
     monkeytool.run(arg)

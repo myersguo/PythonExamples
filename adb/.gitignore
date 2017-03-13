@@ -2,3 +2,4 @@
 *.cover
 *.pyc
 *.log
+output/
