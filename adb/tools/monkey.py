@@ -77,7 +77,7 @@ if __name__ == "__main__":
     monkeytool = Monkey()
     monkey_argv = sys.argv
     if len(monkey_argv)>1:
-        arg = monkey_argv[1]
+        arg = ' '.join(monkey_argv[1:])
     else:
         arg = '-v -v -v -p com.example.android.testing.uiautomator.BasicSample --pct-syskeys 0 --pct-motion 0 --throttle 300 --bugreport 100'
     monkeytool.run(arg)
