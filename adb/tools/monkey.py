@@ -8,7 +8,7 @@ sys.setdefaultencoding('utf-8')
 
 from adb.utility import adb_helper
 from jinja2 import Template
-import time
+import time,datetime
 
 class Monkey(object):
     def __init__(self):
@@ -44,18 +44,34 @@ class Monkey(object):
             if not result1 or not result2:
                 continue
             mem = float(mem.split()[0])
-            cpu_data.append(cpu)
-            mem_data.append(mem)
+            t = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            cpu_data.append([t,cpu])
+            mem_data.append([t,mem])
         #输出为html report
         template_file = os.path.dirname(os.path.abspath(__file__))+"/../template/performance.html"
         f = open(template_file)
         template_str = f.read()
         template = Template(template_str)
         out = template.render({"cpuinfo": cpu_data, "meminfo": mem_data})
-        dest_file = os.path.dirname(os.path.abspath(__file__))+"/../output/" + str(time.time()) + "_monkey_performance.html"
+        dest_file = os.path.dirname(os.path.abspath(__file__))+"/../output/" + time.strftime("%Y-%m-%d_%H_%M_%S", time.gmtime()) + "_monkey_performance.html"
         f = open(dest_file, 'w')
         f.write(out)
+        generateHtml()
 
+def generateHtml():
+    '''
+    获取所有output，生成index.html
+    '''
+    output_path = os.path.dirname(os.path.abspath(__file__))+"/../output/";
+    files = [f for f in os.listdir(output_path) if f != 'index.html' and os.path.isfile(os.path.join(output_path, f))]
+    template_file = os.path.dirname(os.path.abspath(__file__)) + "/../template/index.html"
+    f = open(template_file)
+    template_str = f.read()
+    template = Template(template_str)
+    out = template.render({"files": files})
+    dest_file = os.path.dirname(os.path.abspath(__file__)) + "/../output/index.html"
+    f = open(dest_file, 'w')
+    f.write(out)
 
 if __name__ == "__main__":
     monkeytool = Monkey()

@@ -2,7 +2,12 @@
 <head><title>Index of /</title></head>
 <body bgcolor="white">
 <h1>Index of /</h1><hr>
-<a href="./">reports/</a> 
+
+<ul>
+{% for file in files %}
+  <li><a href="./{{ file }}">{{ file }}</a></li>
+{% endfor %}
+</ul>
 
 </body>
 </html>
