@@ -21,6 +21,9 @@ class Monkey(object):
         :return:
         '''
         devices = self.adb.getConnectDevices()
+        if len(devices)<=0:
+            raise Exception("No device found")
+
         for device in devices:
            self.adb.logger.debug("Device Id: %s Run monkey script:")
            self.adb.setDeviceId(device['uuid'])
@@ -41,11 +44,12 @@ class Monkey(object):
             cpu_data.append(cpu)
             mem_data.append(mem)
         #输出为html report
-        f = open('./template/performance.html')
+        template_file = os.path.dirname(os.path.abspath(__file__))+"/../../template/performance.html"
+        f = open(template_file)
         template_str = f.read()
         template = Template(template_str)
         out = template.render({"cpuinfo": cpu_data, "meminfo": mem_data})
-        dest_file = "./output/" + str(time.time()) + "_monkey_performance.html"
+        dest_file = os.path.dirname(os.path.abspath(__file__))+"/../../output/" + str(time.time()) + "_monkey_performance.html"
         f = open(dest_file, 'w')
         f.write(out)
 

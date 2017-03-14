@@ -2,4 +2,6 @@
 *.cover
 *.pyc
 *.log
-output/
+!output/
+output/*
+!output/index.html
