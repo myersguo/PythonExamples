@@ -13,6 +13,8 @@ import time,datetime
 class Monkey(object):
     def __init__(self):
         self.adb = adb_helper.AdbHelper()
+        self.adb.killAdbServer()
+        self.adb.startAdbServer()
 
     def run(self, args):
         '''
@@ -23,12 +25,14 @@ class Monkey(object):
         devices = self.adb.getConnectDevices()
         if len(devices)<=0:
             raise Exception("No device found")
-
+        process = None
+        #monkey日志保存到文件中
         for device in devices:
            self.adb.logger.debug("Device Id: %s Run monkey script:" % device['uuid'])
            self.adb.setDeviceId(device['uuid'])
-           result,_ = self.adb.shell("monkey " + args, wait=False)
-           print("start monkey %s "  % result)
+           monkey_log = os.path.dirname(os.path.abspath(__file__))+"/../output/" + time.strftime("%Y-%m-%d_%H_%M_%S", time.gmtime()) + "_monkey_log.txt"
+           f = open(monkey_log, 'a')
+           result,process = self.adb.shell("monkey " + args, wait=False, stdout=f)
         #获取统计数据
         cpu_data = []
         mem_data = []

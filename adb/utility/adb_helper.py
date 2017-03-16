@@ -91,21 +91,22 @@ class AdbHelper (object):
                 return True,bi
 
         raise   Exception("%s not found", binaryName)
-    def shell(self, cmd, wait=True):
-        return self.execshell("shell %s" % cmd, wait)
+    def shell(self, cmd, wait=True, stdout=subprocess.PIPE):
+        return self.execshell("shell %s" % cmd, wait, stdout)
 
-    def execshell(self,cmd, wait=True):
+    def execshell(self,cmd, wait=True, stdout=subprocess.PIPE):
         if not cmd:
             raise Exception("command can't be empty")
         fullCmd = self.adb + " " +  " ".join(self.adb_defaultArgs) + " " + cmd
         #return os.popen(fullCmd).readline()
+        if wait == False:
+            process = subprocess.Popen(fullCmd.split(), stdout=stdout)
+            return True, process
         try:
-            process = subprocess.Popen(fullCmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.Popen(fullCmd.split(), stdin=subprocess.PIPE, stdout=stdout, stderr=subprocess.PIPE)
         except (OSError, ValueError) as err:
             self.logger.error("Run %s command Exception", fullCmd)
             raise Exception("subprocesserror")
-        if wait == False:
-            return True,''
         stdoutdata, stderrdata = process.communicate()
         self.logger.debug(fullCmd + " status " + str(process.returncode))
         if process.returncode:
@@ -146,6 +147,9 @@ class AdbHelper (object):
         kill adb server by shell
         """
         return self.execshell("kill-server")
+
+    def startAdbServer(self):
+        return self.execshell("start-server")
 
     def checkProcess(self, processName):
         '''
