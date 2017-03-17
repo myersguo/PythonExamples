@@ -49,6 +49,8 @@ class Monkey(object):
                 continue
             mem = float(mem.split()[0])
             t = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            cpu  = float("%.2f" % cpu)
+            mem = float("%.2f" % mem)
             cpu_data.append([t,cpu])
             mem_data.append([t,mem])
         #输出为html report
@@ -67,7 +69,7 @@ def generateHtml():
     获取所有output，生成index.html
     '''
     output_path = os.path.dirname(os.path.abspath(__file__))+"/../output/";
-    files = [f for f in os.listdir(output_path) if f != 'index.html' and os.path.isfile(os.path.join(output_path, f))]
+    files = [f for f in os.listdir(output_path) if  f.endswith('.html') and   f != 'index.html' and os.path.isfile(os.path.join(output_path, f))]
     template_file = os.path.dirname(os.path.abspath(__file__)) + "/../template/index.html"
     f = open(template_file)
     template_str = f.read()
