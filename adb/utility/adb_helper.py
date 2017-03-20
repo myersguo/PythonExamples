@@ -393,7 +393,7 @@ class AdbHelper (object):
 
         for line in meminfo.split("\r\n"):
             if find in line:
-                return line
+                return True, line
 
     def getProcessCpuInfo(self, pid):
         result,cpuinfo = self.shell("cat /proc/%s/stat" % pid)

@@ -14,6 +14,10 @@ mem 趋势
     <hr>
     <div id="cpu"></div>
     <div id="meminfo"></div>
+    {% if  package_name %}
+    <div id="pcpu"></div>
+    <div id="pmem"></div>
+    {% endif %}
 </div>
 
 <script>
@@ -25,13 +29,17 @@ Highcharts.chart('cpu', {
             zoomType: 'x',
             type: "spline"
      },
+     "xAxis": {
+                "crosshair": true,
+                "type": "datetime",
+                "labels": {
+                    "format": "{value:%Y-%m-%d %H:%M:%S}"
+                }
+     },
      "yAxis":
     {
         "labels": {
             "format": "{value} %"
-        },
-        "title": {
-            "text": "crash率"
         }
     },
     plotOptions: {
@@ -53,6 +61,13 @@ Highcharts.chart('meminfo', {
         zoomType: 'x',
         type: "spline"
     },
+    "xAxis": {
+                "crosshair": true,
+                "type": "datetime",
+                "labels": {
+                    "format": "{value:%Y-%m-%d %H:%M:%S}"
+                }
+     },
      plotOptions: {
         spline: {
             turboThreshold: 0
@@ -63,6 +78,66 @@ Highcharts.chart('meminfo', {
         data: {{ meminfo }}
     }]
 });
+
+{% if  package_name %}
+Highcharts.chart('pcpu', {
+    title: {
+        text: 'CPU(package: {{ package_name }} )使用率'
+    },
+    chart: {
+            zoomType: 'x',
+            type: "spline"
+     },
+     "xAxis": {
+                "crosshair": true,
+                "type": "datetime",
+                "labels": {
+                    "format": "{value:%Y-%m-%d %H:%M:%S}"
+                }
+     },
+     "yAxis":
+    {
+        "labels": {
+            "format": "{value} %"
+        }
+    },
+    plotOptions: {
+        spline: {
+            turboThreshold: 0
+        }
+    },
+    series: [{
+        name: 'CPU使用率',
+        data: {{ pcpu }}
+    }]
+});
+Highcharts.chart('pmem', {
+    title: {
+        text: 'MEM(package: {{ package_name }} )dumpsys meminfo total'
+    },
+    chart: {
+            zoomType: 'x',
+            type: "spline"
+     },
+     "xAxis": {
+                "crosshair": true,
+                "type": "datetime",
+                "labels": {
+                    "format": "{value:%Y-%m-%d %H:%M:%S}"
+                }
+     },
+    plotOptions: {
+        spline: {
+            turboThreshold: 0
+        }
+    },
+    series: [{
+        name: 'Mem heap total',
+        data: {{ pmem }}
+    }]
+});
+{% endif %}
+
 </script>
 
 </body>

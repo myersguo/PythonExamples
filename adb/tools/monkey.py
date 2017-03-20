@@ -26,6 +26,10 @@ class Monkey(object):
         if len(devices)<=0:
             raise Exception("No device found")
         process = None
+        arg_list = args.split(' ')
+        package_name = None
+        if '-p' in arg_list:
+            package_name = arg_list[arg_list.index('-p')+1]
         #monkey日志保存到文件中
         for device in devices:
            self.adb.logger.debug("Device Id: %s Run monkey script:" % device['uuid'])
@@ -36,6 +40,8 @@ class Monkey(object):
         #获取统计数据
         cpu_data = []
         mem_data = []
+        cpu_pkg_data = []
+        mem_pkg_data = []
         time.sleep(3)
         while(True):
             #检查monkey是否结束
@@ -48,17 +54,29 @@ class Monkey(object):
             if not result1 or not result2:
                 continue
             mem = float(mem.split()[0])
-            t = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            #t = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            t = float(round(time.time() * 1000))
             cpu  = float("%.2f" % cpu)
             mem = float("%.2f" % mem)
             cpu_data.append([t,cpu])
             mem_data.append([t,mem])
+            if  package_name:
+                result3, p_cpu = self.adb.getProcessCpuUsage(package_name)
+                if result3:
+                    p_cpu = float("%.2f" % p_cpu)
+                    cpu_pkg_data.append([t,p_cpu])
+                result4, p_mem = self.adb.getDumpmeminfo(package_name)
+                if result4:
+                    p_mem = float(p_mem.split()[1])
+                    mem_pkg_data.append([t, p_mem])
+
+
         #输出为html report
         template_file = os.path.dirname(os.path.abspath(__file__))+"/../template/performance.html"
         f = open(template_file)
         template_str = f.read()
         template = Template(template_str)
-        out = template.render({"cpuinfo": cpu_data, "meminfo": mem_data})
+        out = template.render({"cpuinfo": cpu_data, "meminfo": mem_data, "pcpu": cpu_pkg_data,"pmem": mem_pkg_data, "package_name": package_name})
         dest_file = os.path.dirname(os.path.abspath(__file__))+"/../output/" + time.strftime("%Y-%m-%d_%H_%M_%S", time.gmtime()) + "_monkey_performance.html"
         f = open(dest_file, 'w')
         f.write(out)
